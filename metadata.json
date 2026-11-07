@@ -1,0 +1,8 @@
+{
+  "name": "Remix OpenChat V2",
+  "description": "OpenChat V2 - A modern real-time chat application with servers, voice channels, direct messages, rich media, custom themes, and sound.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
