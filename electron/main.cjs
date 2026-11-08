@@ -1,4 +1,5 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
+const path = require('path');
 
 // Built-in default — matches the Android/iOS apps. Override with OPENCHAT_URL env var.
 const DEFAULT_SERVER_URL = 'https://lid-graduation-automotive-mere.trycloudflare.com';
@@ -12,6 +13,7 @@ function createWindow() {
     minHeight: 600,
     title: 'OpenChat V2',
     backgroundColor: '#1e1f22',
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
@@ -49,11 +49,13 @@
     },
     "files": [
       "electron/**",
+      "build/icon.png",
       "package.json"
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "OpenChatV2-Setup.${ext}"
+      "artifactName": "OpenChatV2-Setup.${ext}",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -63,12 +65,14 @@
     "mac": {
       "target": "pkg",
       "category": "public.app-category.social-networking",
-      "artifactName": "OpenChatV2-macOS.${ext}"
+      "artifactName": "OpenChatV2-macOS.${ext}",
+      "icon": "build/icon.icns"
     },
     "linux": {
       "target": "flatpak",
       "category": "Network",
-      "artifactName": "OpenChatV2.${ext}"
+      "artifactName": "OpenChatV2.${ext}",
+      "icon": "build/icon.png"
     },
     "flatpak": {
       "sdk": "org.freedesktop.Sdk//25.08",
