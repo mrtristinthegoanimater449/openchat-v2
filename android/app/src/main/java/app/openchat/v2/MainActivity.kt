@@ -7,11 +7,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,7 +31,6 @@ import java.util.Date
 import java.util.Locale
 
 private val Bg        = Color(0xFF1E1F22)
-private val RailBg    = Color(0xFF1E1F22)
 private val PanelBg   = Color(0xFF2B2D31)
 private val PanelBg2  = Color(0xFF313338)
 private val HoverBg   = Color(0xFF35373C)
@@ -54,47 +51,33 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun OpenChatApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val activity = context as? ComponentActivity
 
     var serverUrl by remember { mutableStateOf(Api.getServerUrl(context)) }
     var showServerSettings by remember { mutableStateOf(false) }
-    var serverStatus by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var authMode by remember { mutableStateOf("signup") } // signup | login
+    var authMode by remember { mutableStateOf("signup") }
     var authError by remember { mutableStateOf<String?>(null) }
 
     var sessionUser by remember { mutableStateOf(Api.getUserJson(context)?.let { JSONObject(it) }) }
     var rawState by remember {
         mutableStateOf(Api.getStateJson(context)?.let { runCatching { JSONObject(it) }.getOrNull() })
     }
-    var appState by remember { mutableStateOf(Models.parseState(rawState)) }
-    var selectedServerId by remember { mutableStateOf<String?>(null) }
-    var selectedChannelId by remember { mutableStateOf<String?>(null) }
+    var messages by remember { mutableStateOf(Models.globalMessages(rawState)) }
     var messageInput by remember { mutableStateOf("") }
-    var showCreateServer by remember { mutableStateOf(false) }
-    var newServerName by remember { mutableStateOf("") }
 
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
-    fun applyRawState(state: JSONObject?) {
+    fun applyState(state: JSONObject?) {
         rawState = state
         Api.setStateJson(context, state?.toString())
-        appState = Models.parseState(state)
-        // Keep selection valid
-        if (appState.servers.none { it.id == selectedServerId }) {
-            selectedServerId = appState.servers.firstOrNull()?.id
-        }
-        val server = appState.servers.find { it.id == selectedServerId }
-        if (server != null && server.channels.none { it.id == selectedChannelId }) {
-            selectedChannelId = server.channels.firstOrNull { it.type == "text" }?.id
-                ?: server.channels.firstOrNull()?.id
-        }
+        messages = Models.globalMessages(state)
     }
 
     fun refreshFromServer() {
@@ -108,21 +91,21 @@ fun OpenChatApp() {
                     mainHandler.post {
                         sessionUser = user
                         Api.setUserJson(context, user.toString())
-                        applyRawState(state)
-                        serverStatus = "Connected to ${Api.getServerUrl(context)}"
+                        applyState(state)
+                        status = "Connected"
                         busy = false
                     }
                 } else {
                     mainHandler.post {
                         Api.setToken(context, null)
                         sessionUser = null
-                        serverStatus = "Session expired — sign in again"
+                        status = "Session expired — sign in again"
                         busy = false
                     }
                 }
             } catch (e: Exception) {
                 mainHandler.post {
-                    serverStatus = "Can't reach ${Api.getServerUrl(context)}"
+                    status = "Can't reach ${Api.getServerUrl(context)}"
                     busy = false
                 }
             }
@@ -145,8 +128,9 @@ fun OpenChatApp() {
                     busy = false
                     if (res.optBoolean("success", false)) {
                         Api.setToken(context, res.getString("token"))
-                        Api.setUserJson(context, res.getJSONObject("user").toString())
-                        sessionUser = res.getJSONObject("user")
+                        val user = res.getJSONObject("user")
+                        Api.setUserJson(context, user.toString())
+                        sessionUser = user
                         refreshFromServer()
                     } else {
                         authError = res.optString("message", "Authentication failed.")
@@ -155,7 +139,7 @@ fun OpenChatApp() {
             } catch (e: Exception) {
                 mainHandler.post {
                     busy = false
-                    authError = "Can't reach ${Api.getServerUrl(context)}: ${e.message}"
+                    authError = "Can't reach ${Api.getServerUrl(context)}"
                 }
             }
         }.start()
@@ -163,7 +147,6 @@ fun OpenChatApp() {
 
     fun sendMessage() {
         val content = messageInput.trim()
-        val channelId = selectedChannelId ?: return
         val user = sessionUser ?: return
         if (content.isEmpty()) return
 
@@ -171,7 +154,7 @@ fun OpenChatApp() {
         val now = System.currentTimeMillis()
         val msg = JSONObject().apply {
             put("id", "msg-$now")
-            put("channelId", channelId)
+            put("channelId", "global")
             put("author", user)
             put("content", content)
             put("timestamp", "Today at " + sdf.format(Date(now)))
@@ -180,7 +163,7 @@ fun OpenChatApp() {
 
         val state = rawState?.let { JSONObject(it.toString()) } ?: JSONObject()
         val messagesObj = state.optJSONObject("messages") ?: JSONObject().also { state.put("messages", it) }
-        val arr = messagesObj.optJSONArray(channelId) ?: JSONArray().also { messagesObj.put(channelId, it) }
+        val arr = messagesObj.optJSONArray("global") ?: JSONArray().also { messagesObj.put("global", it) }
         arr.put(msg)
 
         busy = true
@@ -189,42 +172,10 @@ fun OpenChatApp() {
             mainHandler.post {
                 busy = false
                 if (ok) {
-                    applyRawState(state)
+                    applyState(state)
                     messageInput = ""
                 } else {
                     toast("Failed to sync message — is the server reachable?")
-                }
-            }
-        }.start()
-    }
-
-    fun createServer() {
-        val name = newServerName.trim()
-        val user = sessionUser ?: return
-        if (name.isEmpty()) return
-
-        val serverJson = Models.newServerJson(name, user)
-        val state = rawState?.let { JSONObject(it.toString()) } ?: JSONObject()
-        val servers = state.optJSONArray("servers") ?: JSONArray().also { state.put("servers", it) }
-        servers.put(serverJson)
-        if (!state.has("messages")) state.put("messages", JSONObject())
-        if (!state.has("friends")) state.put("friends", JSONArray())
-
-        busy = true
-        Thread {
-            val ok = Api.saveState(context, state)
-            mainHandler.post {
-                busy = false
-                showCreateServer = false
-                newServerName = ""
-                if (ok) {
-                    applyRawState(state)
-                    selectedServerId = serverJson.getString("id")
-                    val server = appState.servers.find { it.id == selectedServerId }
-                    selectedChannelId = server?.channels?.firstOrNull { it.type == "text" }?.id
-                    toast("Server created")
-                } else {
-                    toast("Couldn't create server — sync failed")
                 }
             }
         }.start()
@@ -235,20 +186,16 @@ fun OpenChatApp() {
         Api.setToken(context, null)
         Api.setUserJson(context, null)
         sessionUser = null
-        serverStatus = null
         password = ""
         confirmPassword = ""
     }
 
-    // ---------- UI ----------
     Surface(modifier = Modifier.fillMaxSize(), color = Bg) {
 
         // ---------- SETUP + AUTH ----------
         if (sessionUser == null) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
+                modifier = Modifier.fillMaxSize().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -257,11 +204,8 @@ fun OpenChatApp() {
                 Text("Native client — all data from your OpenChat server", color = TextLo, fontSize = 13.sp)
                 Spacer(Modifier.height(24.dp))
 
-                // Server is pre-configured — no entry required. Toggle only if you need to change it.
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier.size(8.dp).clip(CircleShape).background(Green)
-                    )
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Green))
                     Spacer(Modifier.width(6.dp))
                     Text("Connected to OpenChat server", color = TextLo, fontSize = 12.sp)
                     Spacer(Modifier.width(8.dp))
@@ -281,14 +225,13 @@ fun OpenChatApp() {
                     )
                     TextButton(onClick = {
                         Api.setServerUrl(context, serverUrl)
-                        serverStatus = "Saved: ${Api.getServerUrl(context)}"
+                        status = "Saved: ${Api.getServerUrl(context)}"
                     }) { Text("Save server URL", color = Accent) }
-                    serverStatus?.let { Text(it, color = TextLo, fontSize = 11.sp) }
+                    status?.let { Text(it, color = TextLo, fontSize = 11.sp) }
                 }
 
                 Spacer(Modifier.height(20.dp))
 
-                // Auth mode tabs
                 Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(PanelBg)) {
                     listOf("signup" to "Sign Up", "login" to "Log In").forEach { (mode, label) ->
                         val selected = authMode == mode
@@ -356,11 +299,10 @@ fun OpenChatApp() {
             return@Surface
         }
 
-        // ---------- MAIN APP ----------
+        // ---------- GLOBAL CHAT ----------
         val currentUser = sessionUser ?: return@Surface
 
         Column(modifier = Modifier.fillMaxSize().background(Bg)) {
-            // Top bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -368,203 +310,85 @@ fun OpenChatApp() {
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(if (serverStatus?.startsWith("Connected") == true) Green else TextLo)
-                )
+                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Green))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     currentUser.optString("username") + "#" + currentUser.optString("discriminator"),
-                    color = TextMid,
-                    fontSize = 13.sp,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    color = TextMid, fontSize = 13.sp, modifier = Modifier.weight(1f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
-                TextButton(onClick = { refreshFromServer() }) { Text("Sync", color = Accent, fontSize = 13.sp) }
+                TextButton(onClick = { refreshFromServer() }) { Text("Refresh", color = Accent, fontSize = 13.sp) }
                 TextButton(onClick = { logout() }) { Text("Log out", color = Danger, fontSize = 13.sp) }
             }
 
-            if (appState.servers.isEmpty()) {
-                // Empty state — create a server natively
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text("#", color = TextLo, fontSize = 64.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("No servers yet", color = TextHi, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("Create your first server — it syncs to your account.", color = TextLo, fontSize = 13.sp)
-                    Spacer(Modifier.height(20.dp))
-                    Button(
-                        onClick = { showCreateServer = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Accent)
-                    ) { Text("Create your first server", fontWeight = FontWeight.Bold) }
-                }
-            } else {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Server rail
-                    LazyColumn(
-                        modifier = Modifier.fillMaxHeight().width(64.dp).background(RailBg),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        items(appState.servers, key = { it.id }) { server ->
-                            val active = server.id == selectedServerId
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(RoundedCornerShape(if (active) 14.dp else 23.dp))
-                                    .background(if (active) Accent else PanelBg2)
-                                    .clickable {
-                                        selectedServerId = server.id
-                                        selectedChannelId = server.channels.firstOrNull { it.type == "text" }?.id
-                                            ?: server.channels.firstOrNull()?.id
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    server.name.take(2).uppercase(Locale.US),
-                                    color = if (active) Color.White else TextMid,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
-                            }
-                        }
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
-                                    .background(PanelBg2)
-                                    .clickable { showCreateServer = true },
-                                contentAlignment = Alignment.Center
-                            ) { Text("+", color = Green, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
-                        }
+            Text(
+                "Global chat",
+                color = TextLo, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (messages.isEmpty()) {
+                    item {
+                        Text(
+                            "No messages yet — say hi!",
+                            color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(top = 24.dp)
+                        )
                     }
-
-                    // Chat pane
-                    val server = appState.servers.find { it.id == selectedServerId }
-                    val channel = server?.channels?.find { it.id == selectedChannelId }
-                    val messages = channel?.let { appState.messages[it.id] } ?: emptyList()
-
-                    Column(modifier = Modifier.fillMaxSize().background(PanelBg2)) {
-                        // Channel chips
-                        if (server != null) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                items(server.channels) { ch ->
-                                    val active = ch.id == selectedChannelId
-                                    val prefix = if (ch.type == "voice" || ch.type == "stage") "🔊 " else "# "
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(if (active) Accent else PanelBg)
-                                            .clickable { selectedChannelId = ch.id }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(prefix + ch.name, color = if (active) Color.White else TextLo, fontSize = 13.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Messages
-                        LazyColumn(
-                            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            reverseLayout = false
+                }
+                items(messages, key = { it.id }) { msg ->
+                    val own = msg.authorId == currentUser.optString("id")
+                    Row(verticalAlignment = Alignment.Top) {
+                        Box(
+                            modifier = Modifier.size(34.dp).clip(CircleShape)
+                                .background(if (own) Accent else PanelBg),
+                            contentAlignment = Alignment.Center
                         ) {
-                            if (messages.isEmpty()) {
-                                item {
-                                    Text(
-                                        "No messages yet in #${channel?.name ?: "channel"} — say hi!",
-                                        color = TextLo,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.padding(top = 24.dp)
-                                    )
-                                }
-                            }
-                            items(messages, key = { it.id }) { msg ->
-                                val own = msg.authorId == currentUser.optString("id")
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Box(
-                                        modifier = Modifier.size(36.dp).clip(CircleShape)
-                                            .background(if (own) Accent else PanelBg),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(msg.authorUsername.take(1).uppercase(Locale.US), color = Color.White, fontWeight = FontWeight.Bold)
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(msg.authorUsername, color = if (own) Accent else TextHi, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(msg.timestamp, color = TextLo, fontSize = 10.sp)
-                                        }
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(msg.content, color = TextMid, fontSize = 14.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Composer
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = messageInput,
-                                onValueChange = { messageInput = it },
-                                placeholder = { Text("Message #${channel?.name ?: ""}") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                colors = fieldColors(),
-                                shape = RoundedCornerShape(20.dp)
+                            Text(
+                                msg.authorUsername.take(1).uppercase(Locale.US),
+                                color = Color.White, fontWeight = FontWeight.Bold
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Button(
-                                onClick = { sendMessage() },
-                                enabled = !busy && messageInput.isNotBlank() && selectedChannelId != null,
-                                colors = ButtonDefaults.buttonColors(containerColor = Accent),
-                                shape = RoundedCornerShape(20.dp)
-                            ) { Text("Send", fontWeight = FontWeight.Bold) }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(msg.authorUsername, color = if (own) Accent else TextHi,
+                                    fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(msg.timestamp, color = TextLo, fontSize = 10.sp)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(msg.content, color = TextMid, fontSize = 14.sp)
                         }
                     }
                 }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = messageInput,
+                    onValueChange = { messageInput = it },
+                    placeholder = { Text("Message everyone") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    colors = fieldColors(),
+                    shape = RoundedCornerShape(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = { sendMessage() },
+                    enabled = !busy && messageInput.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent),
+                    shape = RoundedCornerShape(20.dp)
+                ) { Text("Send", fontWeight = FontWeight.Bold) }
             }
         }
-    }
-
-    // Create server dialog
-    if (showCreateServer) {
-        AlertDialog(
-            onDismissRequest = { showCreateServer = false },
-            containerColor = PanelBg,
-            title = { Text("Create a server", color = TextHi) },
-            text = {
-                OutlinedTextField(
-                    value = newServerName,
-                    onValueChange = { newServerName = it },
-                    label = { Text("Server name") },
-                    singleLine = true,
-                    colors = fieldColors()
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { createServer() }) { Text("Create", color = Accent, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateServer = false }) { Text("Cancel", color = TextLo) }
-            }
-        )
     }
 }
 

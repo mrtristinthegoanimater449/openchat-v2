@@ -25,7 +25,7 @@ struct RootView: View {
                     withAnimation { sessionUser = user }
                 }
             } else {
-                HomeView(user: Binding(get: { sessionUser! }, set: { sessionUser = $0 })) {
+                ChatView(user: Binding(get: { sessionUser! }, set: { sessionUser = $0 })) {
                     Api.logout()
                     withAnimation { sessionUser = nil }
                 }
@@ -39,7 +39,7 @@ struct RootView: View {
 struct AuthView: View {
     let onAuthenticated: ([String: Any]) -> Void
 
-    @State private var mode: String = "signup" // signup | login
+    @State private var mode: String = "signup"
     @State private var username = ""
     @State private var password = ""
     @State private var confirm = ""
@@ -49,7 +49,7 @@ struct AuthView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                Spacer(minLength: 40)
+                Spacer(minLength: 60)
                 Text("OpenChat V2")
                     .font(.system(size: 34, weight: .heavy))
                     .foregroundColor(textHi)
@@ -139,20 +139,16 @@ struct AuthView: View {
     }
 }
 
-// MARK: - Home (servers / channels / messages)
+// MARK: - Global Chat
 
-struct HomeView: View {
+struct ChatView: View {
     @Binding var user: [String: Any]
     let onLogout: () -> Void
 
-    @State private var appState = AppState(servers: [], messages: [:])
-    @State private var selectedServerID: String?
-    @State private var selectedChannelID: String?
+    @State private var messages: [OcMessage] = []
     @State private var messageText = ""
-    @State private var status = "Connecting…"
+    @State private var status = "Syncing…"
     @State private var busy = false
-    @State private var showCreateServer = false
-    @State private var newServerName = ""
 
     private var userID: String { user["id"] as? String ?? "" }
     private var username: String { user["username"] as? String ?? "You" }
@@ -166,119 +162,50 @@ struct HomeView: View {
                 Text("\(username)#\(discriminator)").font(.footnote.bold()).foregroundColor(textMid)
                     .lineLimit(1)
                 Spacer()
-                Button("Sync") { refresh() }.font(.footnote).foregroundColor(accent)
+                Button("Refresh") { refresh() }.font(.footnote).foregroundColor(accent)
                 Button("Log out") { onLogout() }.font(.footnote).foregroundColor(danger)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .background(panel)
 
-            if appState.servers.isEmpty {
-                // Empty state
-                VStack(spacing: 12) {
-                    Text("#").font(.system(size: 64, weight: .heavy)).foregroundColor(textLo)
-                    Text("No servers yet").font(.title2.bold()).foregroundColor(textHi)
-                    Text("Create your first server — it syncs to your account.")
-                        .font(.footnote).foregroundColor(textLo)
-                    Button("Create your first server") { showCreateServer = true }
-                        .padding(.horizontal, 20).padding(.vertical, 12)
-                        .background(accent).foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10)).fontWeight(.bold)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                HStack(spacing: 0) {
-                    // Server rail
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 10) {
-                            ForEach(appState.servers) { server in
-                                Button {
-                                    selectedServerID = server.id
-                                    selectedChannelID = server.channels.first(where: { $0.type == "text" })?.id
-                                        ?? server.channels.first?.id
-                                } label: {
-                                    Text(String(server.name.prefix(2)).uppercased())
-                                        .font(.headline.bold())
-                                        .frame(width: 48, height: 48)
-                                        .background(server.id == selectedServerID ? accent : panel2)
-                                        .foregroundColor(server.id == selectedServerID ? .white : textMid)
-                                        .clipShape(RoundedRectangle(cornerRadius: server.id == selectedServerID ? 14 : 24))
-                                }
-                            }
-                            Button { showCreateServer = true } label: {
-                                Text("+").font(.title2.bold()).frame(width: 48, height: 48)
-                                    .background(panel2).foregroundColor(.green).clipShape(Circle())
-                            }
-                        }
-                        .padding(.vertical, 10)
+            Text("Global chat")
+                .font(.caption.bold())
+                .foregroundColor(textLo)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 6)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    if messages.isEmpty {
+                        Text("No messages yet — say hi!")
+                            .font(.footnote).foregroundColor(textLo).padding(.top, 24)
                     }
-                    .frame(width: 64)
-                    .background(bg)
-
-                    // Chat pane
-                    let server = appState.servers.first { $0.id == selectedServerID }
-                    let channel = server?.channels.first { $0.id == selectedChannelID }
-                    let messages = channel.flatMap { appState.messages[$0.id] } ?? []
-
-                    VStack(spacing: 0) {
-                        if let server {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(server.channels) { ch in
-                                        Button { selectedChannelID = ch.id } label: {
-                                            Text((ch.type == "text" ? "# " : "🔊 ") + ch.name)
-                                                .font(.footnote.bold())
-                                                .padding(.horizontal, 12).padding(.vertical, 7)
-                                                .background(ch.id == selectedChannelID ? accent : panel)
-                                                .foregroundColor(ch.id == selectedChannelID ? .white : textLo)
-                                                .clipShape(Capsule())
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 10)
-                            }
-                            .padding(.vertical, 8)
-                        }
-
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 10) {
-                                if messages.isEmpty {
-                                    Text("No messages yet — say hi!")
-                                        .font(.footnote).foregroundColor(textLo).padding(.top, 20)
-                                }
-                                ForEach(messages) { msg in
-                                    MessageRow(msg: msg, isOwn: msg.authorId == userID, accent: accent,
-                                               textHi: textHi, textMid: textMid, textLo: textLo, panel: panel)
-                                }
-                            }
-                            .padding(12)
-                        }
-
-                        // Composer
-                        HStack(spacing: 8) {
-                            TextField("Message #\(channel?.name ?? "")", text: $messageText)
-                                .foregroundColor(textHi)
-                                .padding(.horizontal, 14).padding(.vertical, 10)
-                                .background(panel).clipShape(Capsule())
-                                .onSubmit(sendMessage)
-                            Button(action: sendMessage) {
-                                Text("Send").fontWeight(.bold).foregroundColor(.white)
-                                    .padding(.horizontal, 16).padding(.vertical, 10)
-                                    .background(accent).clipShape(Capsule())
-                            }
-                            .disabled(busy || messageText.trimmingCharacters(in: .whitespaces).isEmpty)
-                        }
-                        .padding(10)
+                    ForEach(messages) { msg in
+                        MessageRow(msg: msg, isOwn: msg.authorId == userID, accent: accent,
+                                   textHi: textHi, textMid: textMid, textLo: textLo, panel: panel)
                     }
-                    .background(panel2)
                 }
+                .padding(12)
             }
+
+            // Composer
+            HStack(spacing: 8) {
+                TextField("Message everyone", text: $messageText)
+                    .foregroundColor(textHi)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(panel).clipShape(Capsule())
+                    .onSubmit(sendMessage)
+                Button(action: sendMessage) {
+                    Text("Send").fontWeight(.bold).foregroundColor(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(accent).clipShape(Capsule())
+                }
+                .disabled(busy || messageText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(10)
         }
+        .background(bg.ignoresSafeArea())
         .onAppear { refresh() }
-        .alert("Create a server", isPresented: $showCreateServer) {
-            TextField("Server name", text: $newServerName)
-            Button("Create") { createServer() }
-            Button("Cancel", role: .cancel) { newServerName = "" }
-        }
     }
 
     private func refresh() {
@@ -295,12 +222,7 @@ struct HomeView: View {
                 } else {
                     status = "Can't reach server"
                 }
-                appState = StateParser.parse(state)
-                if selectedServerID == nil { selectedServerID = appState.servers.first?.id }
-                if selectedChannelID == nil {
-                    selectedChannelID = appState.servers.first?.channels.first(where: { $0.type == "text" })?.id
-                        ?? appState.servers.first?.channels.first?.id
-                }
+                messages = StateParser.globalMessages(state)
                 Api.stateJSON = state.flatMap { try? String(data: JSONSerialization.data(withJSONObject: $0), encoding: .utf8) }
             }
         }
@@ -308,13 +230,13 @@ struct HomeView: View {
 
     private func sendMessage() {
         let content = messageText.trimmingCharacters(in: .whitespaces)
-        guard let channelID = selectedChannelID, !content.isEmpty else { return }
+        guard !content.isEmpty else { return }
 
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         let msg: [String: Any] = [
             "id": "msg-\(Int(Date().timeIntervalSince1970 * 1000))",
-            "channelId": channelID,
+            "channelId": "global",
             "author": user,
             "content": content,
             "timestamp": "Today at \(formatter.string(from: Date()))",
@@ -326,12 +248,11 @@ struct HomeView: View {
                let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { return o }
             return [:]
         }()
-        var messages = stateObj["messages"] as? [String: Any] ?? [:]
-        var arr = messages[channelID] as? [[String: Any]] ?? []
+        var m = stateObj["messages"] as? [String: Any] ?? [:]
+        var arr = m["global"] as? [[String: Any]] ?? []
         arr.append(msg)
-        messages[channelID] = arr
-        stateObj["messages"] = messages
-        stateObj["servers"] = stateObj["servers"] ?? []
+        m["global"] = arr
+        stateObj["messages"] = m
 
         busy = true
         Task {
@@ -340,61 +261,10 @@ struct HomeView: View {
                 busy = false
                 if ok {
                     Api.stateJSON = try? String(data: JSONSerialization.data(withJSONObject: stateObj), encoding: .utf8)
-                    appState = StateParser.parse(stateObj)
+                    messages = StateParser.globalMessages(stateObj)
                     messageText = ""
                 } else {
                     status = "Failed to sync message"
-                }
-            }
-        }
-    }
-
-    private func createServer() {
-        let name = newServerName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        let now = Int(Date().timeIntervalSince1970 * 1000)
-        let chanID = "chan-\(now)-general"
-        let server: [String: Any] = [
-            "id": "server-\(now)",
-            "name": name,
-            "icon": "",
-            "description": "Created on OpenChat V2 for iOS",
-            "ownerId": userID,
-            "categories": [
-                ["id": "cat-\(now)-1", "name": "TEXT CHANNELS", "channels": [
-                    ["id": chanID, "name": "general", "type": "text", "topic": "Welcome!", "unreadCount": 0]
-                ]],
-                ["id": "cat-\(now)-2", "name": "VOICE CHANNELS", "channels": [
-                    ["id": "chan-\(now)-voice", "name": "General Lounge", "type": "voice", "participants": [[String: Any]]()]
-                ]]
-            ],
-            "members": [
-                ["user": user, "roles": ["Owner", "Admin"], "joinedAt": "Today", "isOwner": true]
-            ]
-        ]
-
-        var stateObj: [String: Any] = {
-            if let s = Api.stateJSON, let d = s.data(using: .utf8),
-               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { return o }
-            return [:]
-        }()
-        var servers = stateObj["servers"] as? [[String: Any]] ?? []
-        servers.append(server)
-        stateObj["servers"] = servers
-        stateObj["messages"] = stateObj["messages"] ?? [String: Any]()
-        stateObj["friends"] = stateObj["friends"] ?? [[String: Any]]()
-
-        Task {
-            let ok = await Api.saveState(stateObj)
-            await MainActor.run {
-                newServerName = ""
-                if ok {
-                    Api.stateJSON = try? String(data: JSONSerialization.data(withJSONObject: stateObj), encoding: .utf8)
-                    appState = StateParser.parse(stateObj)
-                    selectedServerID = server["id"] as? String
-                    selectedChannelID = chanID
-                } else {
-                    status = "Couldn't create server"
                 }
             }
         }
@@ -409,7 +279,7 @@ struct MessageRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
-                Circle().fill(isOwn ? accent : panel).frame(width: 36, height: 36)
+                Circle().fill(isOwn ? accent : panel).frame(width: 34, height: 34)
                 Text(String(msg.authorUsername.prefix(1)).uppercased())
                     .font(.footnote.bold()).foregroundColor(.white)
             }
