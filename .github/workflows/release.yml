@@ -87,8 +87,93 @@ jobs:
           path: OpenChatV2-debug.apk
           retention-days: 1
 
+  desktop-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run dist:win
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: release/OpenChatV2-Setup.exe
+          retention-days: 1
+
+  desktop-macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS package
+        run: npm run dist:mac
+
+      - name: Upload PKG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg
+          path: release/OpenChatV2-macOS.pkg
+          retention-days: 1
+
+  desktop-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --user flathub org.freedesktop.Sdk//22.08 org.freedesktop.Platform//22.08 org.electronjs.Electron2.BaseApp//22.08
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Flatpak
+        run: npm run dist:linux
+
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: release/OpenChatV2.flatpak
+          retention-days: 1
+
   release:
-    needs: [ipa, apk]
+    needs: [ipa, apk, desktop-windows, desktop-macos, desktop-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -102,6 +187,21 @@ jobs:
         with:
           name: apk
 
+      - name: Download EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: exe
+
+      - name: Download PKG
+        uses: actions/download-artifact@v4
+        with:
+          name: pkg
+
+      - name: Download Flatpak
+        uses: actions/download-artifact@v4
+        with:
+          name: flatpak
+
       - name: Create / update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,11 +211,14 @@ jobs:
           gh release create v2.0.0 \
             --repo "$GITHUB_REPOSITORY" \
             --title "OpenChat V2" \
-            --notes "OpenChat V2 (native apps, unsigned)
+            --notes "OpenChat V2 — web + desktop + mobile clients (unsigned)
 
-          - OpenChatV2-unsigned.ipa — install via AltStore/Sideloadly
+          - OpenChatV2-Setup.exe — Windows installer
+          - OpenChatV2-macOS.pkg — macOS package
+          - OpenChatV2.flatpak — Linux Flatpak
           - OpenChatV2-debug.apk — Android debug build
+          - OpenChatV2-unsigned.ipa — iOS (AltStore/Sideloadly)
 
-          Server: https://lid-graduation-automotive-mere.trycloudflare.com
+          All apps point at: https://lid-graduation-automotive-mere.trycloudflare.com
           (update the app if the tunnel URL changes)" \
-            OpenChatV2-unsigned.ipa OpenChatV2-debug.apk
+            OpenChatV2-Setup.exe OpenChatV2-macOS.pkg OpenChatV2.flatpak OpenChatV2-debug.apk OpenChatV2-unsigned.ipa

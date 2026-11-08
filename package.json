@@ -3,12 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
     "api": "node server.js",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac pkg",
+    "dist:linux": "electron-builder --linux flatpak",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -25,6 +30,8 @@
     "motion": "^12.23.24"
   },
   "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -33,5 +40,47 @@
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
     "@types/express": "^4.17.21"
+  },
+  "build": {
+    "appId": "app.openchat.v2",
+    "productName": "OpenChat V2",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "OpenChatV2-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "OpenChat V2"
+    },
+    "mac": {
+      "target": "pkg",
+      "category": "public.app-category.social-networking",
+      "artifactName": "OpenChatV2-macOS.${ext}"
+    },
+    "linux": {
+      "target": "flatpak",
+      "category": "Network",
+      "artifactName": "OpenChatV2.${ext}"
+    },
+    "flatpak": {
+      "sdk": "org.freedesktop.Sdk//22.08",
+      "runtime": "org.freedesktop.Platform//22.08",
+      "base": "org.electronjs.Electron2.BaseApp//22.08",
+      "finishArgs": [
+        "--share=network",
+        "--share=ipc",
+        "--socket=pulseaudio",
+        "--socket=x11",
+        "--device=dri"
+      ]
+    }
   }
 }

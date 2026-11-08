@@ -16,3 +16,4 @@ ios/build/
 ios/Payload/
 ios/*.ipa
 youtube-data/
+release/
