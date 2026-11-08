@@ -78,8 +78,10 @@ fun OpenChatApp() {
 
     LaunchedEffect(Unit) {
         Thread {
+            val stored = Api.getServerUrl(context)
+            if (stored.isNotBlank() && Api.probeUrl(stored)) return@Thread
             val discovered = Api.fetchDiscoveryUrl()
-            if (!discovered.isNullOrBlank() && discovered != serverUrl) {
+            if (!discovered.isNullOrBlank() && Api.probeUrl(discovered)) {
                 Api.setServerUrl(context, discovered)
                 mainHandler.post { serverUrl = discovered }
             }

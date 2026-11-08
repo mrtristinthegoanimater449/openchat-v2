@@ -37,26 +37,43 @@ export function isDesktop(): boolean {
   );
 }
 
+async function probeUrl(url: string): Promise<boolean> {
+  if (!url) return false;
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(url.replace(/\/+$/, '') + '/api/health', {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    clearTimeout(t);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Resolve the server URL at startup. Runs before the UI mounts so the first
- * render already knows where to talk.
+ * Resolve the server URL at startup. Always probes the stored URL; if it's
+ * dead, fall back to the auto-discovered cloudflared_link.json from the repo.
  */
 export async function resolveServerUrl(): Promise<string> {
-  // 1) localStorage
   const stored = getApiBase();
-  if (stored) return stored;
 
-  // 2) desktop shell convenience default
+  if (stored && (await probeUrl(stored))) {
+    return stored;
+  }
+
+  // Stored URL is dead or missing → try discovery
   if (isDesktop()) {
     const params = new URLSearchParams(window.location.search);
     const server = (params.get('server') || '').trim().replace(/\/+$/, '');
-    if (server) {
+    if (server && (await probeUrl(server))) {
       setApiBase(server);
       return server;
     }
   }
 
-  // 3) auto-discovery from GitHub
   try {
     const res = await fetch(AUTO_DISCOVER_URL, { cache: 'no-store' });
     if (res.ok) {
@@ -68,7 +85,9 @@ export async function resolveServerUrl(): Promise<string> {
       }
     }
   } catch {
-    /* network unavailable — caller decides what to do */
+    /* GitHub raw unreachable */
   }
-  return '';
+
+  // Discovery failed → keep stored value rather than nothing (caller may retry later)
+  return stored || '';
 }

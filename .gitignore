@@ -18,3 +18,5 @@ youtube-data/
 release/
 create-repo.ps1
 push-deployment.ps1
+tools/
+cleanup.ps1

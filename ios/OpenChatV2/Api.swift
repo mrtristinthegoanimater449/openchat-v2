@@ -17,6 +17,11 @@ enum Api {
     /// Fetches the current tunnel URL committed to the repo. Self-updates the
     /// app so it always points at the live server after a tunnel restart.
     static func refreshServerURL() async {
+        // Probe stored URL first; if it's dead, fall back to the repo-hosted URL.
+        if let stored = UserDefaults.standard.string(forKey: "server_url"), !stored.isEmpty,
+           await probeURL(stored) {
+            return
+        }
         guard let u = URL(string: "https://raw.githubusercontent.com/mrtristinthegoanimater449/openchat-v2/main/cloudflared_link.json") else { return }
         guard let (data, resp) = try? await URLSession.shared.data(from: u),
               (resp as? HTTPURLResponse)?.statusCode == 200,
@@ -26,6 +31,15 @@ enum Api {
         if trimmed.hasPrefix("http") {
             UserDefaults.standard.set(trimmed, forKey: "server_url")
         }
+    }
+
+    private static func probeURL(_ url: String) async -> Bool {
+        guard let base = URL(string: url), let u = URL(string: base.absoluteString + "/api/health") else { return false }
+        var req = URLRequest(url: u)
+        req.timeoutInterval = 1.5
+        guard let (_, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse else { return false }
+        return http.statusCode == 200
     }
 
     static var token: String? {

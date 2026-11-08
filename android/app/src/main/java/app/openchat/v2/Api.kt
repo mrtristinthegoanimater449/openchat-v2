@@ -110,6 +110,20 @@ object Api {
         }
     }
 
+    fun probeUrl(url: String): Boolean {
+        return try {
+            val target = url.trimEnd('/') + "/api/health"
+            val conn = (URL(target).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 1500
+                readTimeout = 1500
+                requestMethod = "GET"
+            }
+            conn.responseCode == 200
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun login(context: Context, username: String, password: String): JSONObject {
         val (code, text) = request(context, "POST", "/api/auth/login",
             JSONObject().put("username", username).put("password", password), auth = false)
