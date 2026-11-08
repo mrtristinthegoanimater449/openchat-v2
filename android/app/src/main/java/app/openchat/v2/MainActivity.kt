@@ -1,7 +1,6 @@
 package app.openchat.v2
 
-import android.content.Intent
-import android.net.Uri
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -71,6 +70,9 @@ fun OpenChatApp() {
     }
     var messages by remember { mutableStateOf(Models.globalMessages(rawState)) }
     var messageInput by remember { mutableStateOf("") }
+    var musicOn by remember { mutableStateOf(false) }
+    var musicBusy by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
@@ -183,7 +185,48 @@ fun OpenChatApp() {
         }.start()
     }
 
+    fun toggleMusic() {
+        if (musicOn) {
+            mediaPlayer?.let { runCatching { it.stop(); it.release() } }
+            mediaPlayer = null
+            musicOn = false
+            return
+        }
+        musicBusy = true
+        Thread {
+            val url = Api.musicStreamUrl(context)
+            mainHandler.post {
+                musicBusy = false
+                if (url.isNullOrBlank()) {
+                    toast("Could not start the music stream")
+                    return@post
+                }
+                try {
+                    val mp = MediaPlayer()
+                    mp.setDataSource(url)
+                    mp.isLooping = true
+                    mp.setOnPreparedListener { it.start() }
+                    mp.setOnErrorListener { _, _, _ ->
+                        toast("Playback error")
+                        runCatching { mp.release() }
+                        mediaPlayer = null
+                        musicOn = false
+                        true
+                    }
+                    mp.prepareAsync()
+                    mediaPlayer = mp
+                    musicOn = true
+                } catch (e: Exception) {
+                    toast("Could not start the music stream")
+                }
+            }
+        }.start()
+    }
+
     fun logout() {
+        mediaPlayer?.let { runCatching { it.stop(); it.release() } }
+        mediaPlayer = null
+        musicOn = false
         Thread { Api.logout(context) }.start()
         Api.setToken(context, null)
         Api.setUserJson(context, null)
@@ -319,10 +362,12 @@ fun OpenChatApp() {
                     color = TextMid, fontSize = 13.sp, modifier = Modifier.weight(1f),
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
-                TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtu.be/9suR53954uM?si=_Vc8g5mc2gJPz9LH"))
-                    context.startActivity(intent)
-                }) { Text("🎵 Music", color = Accent, fontSize = 13.sp) }
+                TextButton(onClick = { toggleMusic() }, enabled = !musicBusy) {
+                    Text(
+                        if (musicOn) "⏹ Stop" else "🎵 Music",
+                        color = Accent, fontSize = 13.sp
+                    )
+                }
                 TextButton(onClick = { refreshFromServer() }) { Text("Refresh", color = Accent, fontSize = 13.sp) }
                 TextButton(onClick = { logout() }) { Text("Log out", color = Danger, fontSize = 13.sp) }
             }

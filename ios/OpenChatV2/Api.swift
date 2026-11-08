@@ -99,6 +99,13 @@ enum Api {
         userJSON = nil
     }
 
+    static func musicStreamURL() async -> URL? {
+        guard let (code, data) = try? await request("GET", path: "/api/music/stream"), code == 200,
+              let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let urlString = obj["url"] as? String, let url = URL(string: urlString) else { return nil }
+        return url
+    }
+
     /// Returns the server's copy of app state, or nil if none saved yet.
     static func fetchState() async -> [String: Any]? {
         guard let (code, data) = try? await request("GET", path: "/api/state"), code == 200,

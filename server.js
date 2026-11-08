@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -58,6 +59,46 @@ app.use(express.json({ limit: '32kb' }));
 
 // ---------- API ----------
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// ---------- music streaming via yt-dlp ----------
+const MUSIC_TRACK = 'https://youtu.be/9suR53954uM';
+const MUSIC_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+const musicCache = { url: null, direct: null, fetchedAt: 0 };
+
+function isYoutubeUrl(u) {
+  return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)\//i.test(u || '');
+}
+
+app.get('/api/music/stream', (req, res) => {
+  const track = String(req.query.track || MUSIC_TRACK);
+  if (!isYoutubeUrl(track)) {
+    return res.status(400).json({ success: false, message: 'Only YouTube URLs allowed.' });
+  }
+
+  const now = Date.now();
+  if (musicCache.direct && musicCache.url === track && now - musicCache.fetchedAt < MUSIC_CACHE_TTL_MS) {
+    return res.json({ success: true, url: musicCache.direct, cached: true });
+  }
+
+  execFile(
+    'yt-dlp',
+    ['--no-playlist', '-f', 'bestaudio/best', '--get-url', track],
+    { timeout: 20000, maxBuffer: 1024 * 1024 },
+    (err, stdout, stderr) => {
+      if (err) {
+        return res.status(502).json({
+          success: false,
+          message: 'yt-dlp failed',
+          detail: String(stderr || err).slice(0, 500),
+        });
+      }
+      const direct = stdout.trim().split(/\r?\n/).filter(Boolean).pop();
+      musicCache.url = track;
+      musicCache.direct = direct;
+      musicCache.fetchedAt = now;
+      res.json({ success: true, url: direct });
+    });
+});
 
 app.post('/api/auth/register', (req, res) => {
   const { username, password } = req.body ?? {};

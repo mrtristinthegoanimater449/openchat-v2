@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, FormEvent } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { apiUrl } from './lib/apiBase';
-import { Send, MessageCircle, LogOut, RefreshCw, Music, X } from 'lucide-react';
+import { Send, MessageCircle, LogOut, RefreshCw, Music } from 'lucide-react';
 
 const CHAT_KEY = 'global';
 
@@ -20,10 +20,9 @@ function GlobalChat() {
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState<'syncing' | 'connected' | 'offline'>('syncing');
   const [syncing, setSyncing] = useState(false);
-  const [musicOn, setMusicOn] = useState(() => {
-    try { return localStorage.getItem('openchat_music_on') === '1'; }
-    catch { return false; }
-  });
+  const [musicBusy, setMusicBusy] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [musicOn, setMusicOn] = useState(false);
   const pulledRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
   const user = session!;
@@ -93,12 +92,35 @@ function GlobalChat() {
     setDraft('');
   };
 
-  const toggleMusic = () => {
-    setMusicOn((v) => {
-      const next = !v;
-      try { localStorage.setItem('openchat_music_on', next ? '1' : '0'); } catch { /* ignore */ }
-      return next;
-    });
+  const toggleMusic = async () => {
+    if (musicOn) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setMusicOn(false);
+      return;
+    }
+    setMusicBusy(true);
+    try {
+      const r = await fetch(apiUrl('/api/music/stream'));
+      const data = await r.json();
+      if (!data?.url) throw new Error(data?.message || 'no stream');
+      const audio = new Audio(data.url);
+      audio.loop = true;
+      audio.volume = 0.8;
+      // autoplay from a user gesture is allowed
+      try {
+        await audio.play();
+      } catch {
+        /* ignore autoplay block here — user can press play */
+      }
+      audioRef.current = audio;
+      setMusicOn(true);
+    } catch (e) {
+      setStatus('offline');
+      alert('Could not start the music stream. Is yt-dlp installed on the server?');
+    } finally {
+      setMusicBusy(false);
+    }
   };
 
   const refresh = async () => {
@@ -140,10 +162,11 @@ function GlobalChat() {
           </div>
           <button
             onClick={toggleMusic}
+            disabled={musicBusy}
             className={`p-2 rounded-md transition-colors ${musicOn ? 'bg-[#5865F2]/20 text-[#5865F2]' : 'text-[#949ba4] hover:text-white hover:bg-[#35373c]'}`}
             title="Music"
           >
-            <Music className="w-4 h-4" />
+            <Music className={`w-4 h-4 ${musicBusy ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={refresh}
@@ -161,25 +184,7 @@ function GlobalChat() {
           </button>
         </header>
 
-        {/* Music player — embeds the song */}
-        {musicOn && (
-          <div className="shrink-0 relative bg-black border-b border-[#232428]">
-            <iframe
-              title="OpenChat Music"
-              src="https://www.youtube.com/embed/9suR53954uM?autoplay=1&loop=1&playlist=9suR53954uM&rel=0"
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-              className="w-full h-44"
-            />
-            <button
-              onClick={() => setMusicOn(false)}
-              title="Close player"
-              className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-white hover:bg-black/80 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        {/* Music button now plays in the background — no visible embed */}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

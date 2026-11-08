@@ -101,6 +101,12 @@ object Api {
         return JSONObject(text).put("_http", code)
     }
 
+    fun musicStreamUrl(context: Context): String? {
+        val (code, text) = request(context, "GET", "/api/music/stream")
+        if (code != 200) return null
+        return runCatching { JSONObject(text).optString("url").takeIf { it.isNotBlank() } }.getOrNull()
+    }
+
     fun logout(context: Context) {
         try { request(context, "POST", "/api/auth/logout", JSONObject()) } catch (_: Exception) {}
         setToken(context, null)

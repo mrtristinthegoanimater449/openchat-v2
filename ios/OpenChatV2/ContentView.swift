@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -152,17 +153,47 @@ struct ChatView: View {
     @State private var messageText = ""
     @State private var status = "Syncing…"
     @State private var busy = false
+    @State private var musicOn = false
+    @State private var musicBusy = false
+    @State private var musicPlayer: AVPlayer?
 
     private var userID: String { user["id"] as? String ?? "" }
     private var username: String { user["username"] as? String ?? "You" }
     private var discriminator: String { user["discriminator"] as? String ?? "0000" }
 
-    private func openMusic() {
-        guard let url = URL(string: "https://youtu.be/9suR53954uM?si=_Vc8g5mc2gJPz9LH") else { return }
-        #if canImport(UIKit)
-        UIApplication.shared.open(url)
-        #endif
+    private func toggleMusic() {
+        if musicOn {
+            musicPlayer?.pause()
+            musicPlayer = nil
+            musicOn = false
+            return
+        }
+        musicBusy = true
+        Task {
+            guard let url = await Api.musicStreamURL() else {
+                await MainActor.run {
+                    musicBusy = false
+                    status = "Couldn't stream music"
+                }
+                return
+            }
+            await MainActor.run {
+                musicBusy = false
+                let item = AVPlayerItem(url: url)
+                musicPlayer = AVPlayer(playerItem: item)
+                musicPlayer?.volume = 0.8
+                musicPlayer?.play()
+                musicOn = true
+                status = "Streaming music"
+                NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
+                    musicPlayer?.seek(to: .zero)
+                    musicPlayer?.play()
+                }
+            }
+        }
     }
+
+
 
     var body: some View {
         VStack(spacing: 0) {
@@ -172,7 +203,7 @@ struct ChatView: View {
                 Text("\(username)#\(discriminator)").font(.footnote.bold()).foregroundColor(textMid)
                     .lineLimit(1)
                 Spacer()
-                Button("Music") { openMusic() }.font(.footnote).foregroundColor(accent)
+                Button(musicOn ? "⏹ Stop" : "Music") { toggleMusic() }.font(.footnote).foregroundColor(accent)
                 Button("Refresh") { refresh() }.font(.footnote).foregroundColor(accent)
                 Button("Log out") { onLogout() }.font(.footnote).foregroundColor(danger)
             }
