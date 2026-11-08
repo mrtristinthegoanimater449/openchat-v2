@@ -162,10 +162,51 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build unpacked Electron app
+        run: npx electron-builder --linux dir --publish never
+
+      - name: Write Flatpak manifest
+        run: |
+          cat > openchat-v2.yml <<'EOF'
+          app-id: app.openchat.v2
+          runtime: org.freedesktop.Platform
+          runtime-version: '25.08'
+          sdk: org.freedesktop.Sdk
+          command: open-chat-v2
+          finish-args:
+            - --share=network
+            - --share=ipc
+            - --socket=x11
+            - --socket=wayland
+            - --socket=pulseaudio
+            - --device=dri
+          modules:
+            - name: openchat-v2
+              buildsystem: simple
+              build-commands:
+                - mkdir -p /app/openchat-v2
+                - cp -R openchat-v2/. /app/openchat-v2/
+                - install -Dm755 open-chat-v2.sh /app/bin/open-chat-v2
+              sources:
+                - type: dir
+                  path: release/linux-unpacked
+                  dest: openchat-v2
+                - type: script
+                  dest-filename: open-chat-v2.sh
+                  contents: |
+                    #!/bin/sh
+                    exec /app/openchat-v2/open-chat-v2 --no-sandbox "$@"
+          EOF
+
       - name: Build Flatpak
         env:
           XDG_RUNTIME_DIR: /run/user/1001
-        run: npm run dist:linux
+        run: |
+          set -e
+          flatpak-builder --force-clean --install-deps-from=flathub build-dir openchat-v2.yml
+          flatpak-builder --repo=repo build-dir openchat-v2.yml
+          flatpak build-bundle repo release/OpenChatV2.flatpak app.openchat.v2
+          ls -lh release/OpenChatV2.flatpak
 
       - name: Upload Flatpak artifact
         uses: actions/upload-artifact@v4
