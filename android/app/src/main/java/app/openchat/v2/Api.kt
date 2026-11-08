@@ -4,7 +4,6 @@ import android.content.Context
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -57,22 +56,26 @@ object Api {
         auth: Boolean = true
     ): Pair<Int, String> {
         val url = URL(getServerUrl(context) + path)
+        val bodyBytes = body?.toString()?.toByteArray(Charsets.UTF_8)
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 10_000
             readTimeout = 15_000
             doInput = true
             setRequestProperty("Accept", "application/json")
-            if (body != null) {
+            if (bodyBytes != null) {
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
+                // Explicit length — Cloudflare/some proxies reject chunked bodies
+                setFixedLengthStreamingMode(bodyBytes.size)
+                setRequestProperty("Content-Length", bodyBytes.size.toString())
             }
             if (auth) {
                 getToken(context)?.let { setRequestProperty("Authorization", "Bearer $it") }
             }
         }
-        if (body != null) {
-            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body.toString()) }
+        if (bodyBytes != null) {
+            conn.outputStream.use { it.write(bodyBytes) }
         }
         val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
         val text = stream?.let { s ->

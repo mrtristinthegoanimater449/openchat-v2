@@ -1,5 +1,7 @@
 package app.openchat.v2
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -317,6 +319,10 @@ fun OpenChatApp() {
                     color = TextMid, fontSize = 13.sp, modifier = Modifier.weight(1f),
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtu.be/9suR53954uM?si=_Vc8g5mc2gJPz9LH"))
+                    context.startActivity(intent)
+                }) { Text("🎵 Music", color = Accent, fontSize = 13.sp) }
                 TextButton(onClick = { refreshFromServer() }) { Text("Refresh", color = Accent, fontSize = 13.sp) }
                 TextButton(onClick = { logout() }) { Text("Log out", color = Danger, fontSize = 13.sp) }
             }

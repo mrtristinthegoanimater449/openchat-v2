@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 private let bg      = Color(red: 0x1e/255, green: 0x1f/255, blue: 0x22/255)
 private let panel   = Color(red: 0x2b/255, green: 0x2d/255, blue: 0x31/255)
@@ -154,6 +157,13 @@ struct ChatView: View {
     private var username: String { user["username"] as? String ?? "You" }
     private var discriminator: String { user["discriminator"] as? String ?? "0000" }
 
+    private func openMusic() {
+        guard let url = URL(string: "https://youtu.be/9suR53954uM?si=_Vc8g5mc2gJPz9LH") else { return }
+        #if canImport(UIKit)
+        UIApplication.shared.open(url)
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
@@ -162,6 +172,7 @@ struct ChatView: View {
                 Text("\(username)#\(discriminator)").font(.footnote.bold()).foregroundColor(textMid)
                     .lineLimit(1)
                 Spacer()
+                Button("Music") { openMusic() }.font(.footnote).foregroundColor(accent)
                 Button("Refresh") { refresh() }.font(.footnote).foregroundColor(accent)
                 Button("Log out") { onLogout() }.font(.footnote).foregroundColor(danger)
             }

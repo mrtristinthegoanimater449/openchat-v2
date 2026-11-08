@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, FormEvent } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { apiUrl } from './lib/apiBase';
-import { Send, MessageCircle, LogOut, RefreshCw } from 'lucide-react';
+import { Send, MessageCircle, LogOut, RefreshCw, Music, X } from 'lucide-react';
 
 const CHAT_KEY = 'global';
 
@@ -20,6 +20,10 @@ function GlobalChat() {
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState<'syncing' | 'connected' | 'offline'>('syncing');
   const [syncing, setSyncing] = useState(false);
+  const [musicOn, setMusicOn] = useState(() => {
+    try { return localStorage.getItem('openchat_music_on') === '1'; }
+    catch { return false; }
+  });
   const pulledRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
   const user = session!;
@@ -89,6 +93,14 @@ function GlobalChat() {
     setDraft('');
   };
 
+  const toggleMusic = () => {
+    setMusicOn((v) => {
+      const next = !v;
+      try { localStorage.setItem('openchat_music_on', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const refresh = async () => {
     setSyncing(true);
     try {
@@ -127,6 +139,13 @@ function GlobalChat() {
             {status === 'connected' ? 'Synced' : status === 'offline' ? 'Offline' : 'Syncing…'}
           </div>
           <button
+            onClick={toggleMusic}
+            className={`p-2 rounded-md transition-colors ${musicOn ? 'bg-[#5865F2]/20 text-[#5865F2]' : 'text-[#949ba4] hover:text-white hover:bg-[#35373c]'}`}
+            title="Music"
+          >
+            <Music className="w-4 h-4" />
+          </button>
+          <button
             onClick={refresh}
             className="p-2 rounded-md text-[#949ba4] hover:text-white hover:bg-[#35373c] transition-colors"
             title="Refresh"
@@ -141,6 +160,26 @@ function GlobalChat() {
             <LogOut className="w-4 h-4" />
           </button>
         </header>
+
+        {/* Music player — embeds the song */}
+        {musicOn && (
+          <div className="shrink-0 relative bg-black border-b border-[#232428]">
+            <iframe
+              title="OpenChat Music"
+              src="https://www.youtube.com/embed/9suR53954uM?autoplay=1&loop=1&playlist=9suR53954uM&rel=0"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              className="w-full h-44"
+            />
+            <button
+              onClick={() => setMusicOn(false)}
+              title="Close player"
+              className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-white hover:bg-black/80 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
