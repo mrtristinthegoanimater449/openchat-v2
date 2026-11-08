@@ -18,6 +18,7 @@ import {
   POPULAR_TRACKS,
 } from '../data/initialData';
 import { soundEffects } from '../utils/audio';
+import { apiUrl } from '../lib/apiBase';
 
 interface DiscordContextType {
   currentUser: User;
@@ -226,7 +227,7 @@ export const DiscordProvider: React.FC<{ children: ReactNode }> = ({ children })
       syncPulledRef.current = true; // no backend login → local-only mode, pushes are skipped anyway
       return;
     }
-    fetch('/api/state', {
+    fetch(apiUrl('/api/state'), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
@@ -252,7 +253,7 @@ export const DiscordProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!token) return;
     if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
     syncTimerRef.current = window.setTimeout(() => {
-      fetch('/api/state', {
+      fetch(apiUrl('/api/state'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

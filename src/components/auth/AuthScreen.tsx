@@ -3,10 +3,18 @@ import { motion } from 'motion/react';
 import { MessageSquare, UserPlus, LogIn, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { GOOGLE_CLIENT_ID } from '../../config';
+import { getApiBase, setApiBase, isDesktop } from '../../lib/apiBase';
 
 declare const google: any;
 
 export const AuthScreen: React.FC = () => {
+  const desktop = isDesktop();
+  const [serverConfigured, setServerConfigured] = useState(
+    () => !desktop || !!getApiBase()
+  );
+  const [serverInput, setServerInput] = useState(() => getApiBase() || '');
+  const [serverSaving, setServerSaving] = useState(false);
+
   const { signUp, logIn, signInWithGoogle } = useAuth();
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
@@ -36,6 +44,70 @@ export const AuthScreen: React.FC = () => {
     }
     // On success the AuthGate in App.tsx swaps to the main app automatically.
   };
+
+  // Desktop first-run: pick the OpenChat server before anything else.
+  if (!serverConfigured) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#1e1f22] text-[#dbdee1] font-sans antialiased overflow-hidden relative">
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+          className="relative w-full max-w-md mx-4 bg-[#2b2d31] rounded-2xl shadow-2xl border border-[#1f2023] p-8"
+        >
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-[#5865F2] flex items-center justify-center shadow-lg shadow-[#5865F2]/30 mb-3">
+              <MessageSquare className="w-7 h-7 text-white" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">Connect to server</h1>
+            <p className="text-sm text-[#949ba4] mt-1 text-center">
+              OpenChat V2 needs an OpenChat server. Enter its address — you can change this later.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const clean = serverInput.trim().replace(/\/+$/, '');
+              if (!/^https?:\/\/.+/.test(clean)) return;
+              setServerSaving(true);
+              setApiBase(clean);
+              // Reload so every part of the app re-reads the configured server
+              window.location.reload();
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-[11px] font-bold text-[#b5bac1] uppercase tracking-wider mb-1.5">
+                Server URL
+              </label>
+              <input
+                type="text"
+                value={serverInput}
+                onChange={(e) => setServerInput(e.target.value)}
+                placeholder="https://your-server.example.com"
+                autoFocus
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                className="w-full bg-[#1e1f22] border border-[#1f2023] focus:border-[#5865F2] rounded-md px-3 py-2.5 text-sm text-white placeholder-[#4e5058] outline-none transition-colors"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={serverSaving || !/^https?:\/\/.+/.test(serverInput.trim())}
+              className="w-full flex items-center justify-center gap-2 bg-[#5865F2] hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-md py-2.5 text-sm transition-colors cursor-pointer"
+            >
+              {serverSaving ? 'Connecting…' : 'Connect'}
+            </button>
+            <p className="text-[11px] text-[#4e5058] text-center">
+              Tip: a fixed domain beats a disposable trycloudflare.com URL.
+            </p>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Render the official Google button once the GIS script is available
   useEffect(() => {
@@ -225,6 +297,17 @@ export const AuthScreen: React.FC = () => {
         <p className="text-[11px] text-[#4e5058] text-center mt-5">
           Accounts and sessions are stored on the OpenChat server (`accounts.json`); Google sign-in is verified server-side.
         </p>
+        {desktop && (
+          <button
+            onClick={() => {
+              setApiBase('');
+              window.location.reload();
+            }}
+            className="mt-3 w-full text-[11px] text-[#949ba4] hover:text-white underline underline-offset-2 transition-colors cursor-pointer text-center"
+          >
+            Server: {getApiBase() || '(none)'} — Change
+          </button>
+        )}
       </motion.div>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { apiUrl } from '../lib/apiBase';
 
 export interface Account {
   id: string;
@@ -23,7 +24,7 @@ const TOKEN_KEY = 'openchat_token';
 
 async function api(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',

@@ -102,6 +102,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: Build web assets
+        run: npm run build
 
       - name: Build Windows installer
         run: npm run dist:win
@@ -128,6 +130,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: Build web assets
+        run: npm run build
 
       - name: Build macOS package
         run: npm run dist:mac
@@ -161,6 +165,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: Build web assets
+        run: npm run build
 
       - name: Build unpacked Electron app
         run: npx electron-builder --linux dir --publish never
