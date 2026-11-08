@@ -18,7 +18,7 @@
 $ErrorActionPreference = 'Continue'
 
 $RepoUser = 'mrtristinthegoanimater449'
-$RepoName = 'OpenChat-Deployment'
+$RepoName = 'openchat-v2'
 $RepoBranch = 'main'
 $LinkPath = 'cloudflared_link.json'
 $LocalApi = 'http://localhost:3000'
