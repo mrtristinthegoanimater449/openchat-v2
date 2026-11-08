@@ -159,9 +159,6 @@ jobs:
           sudo flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           sudo flatpak install -y --assumeyes flathub org.freedesktop.Sdk//25.08 org.freedesktop.Platform//25.08 org.electronjs.Electron2.BaseApp//25.08
 
-      - name: Verify Flatpak SDK
-        run: flatpak info org.freedesktop.Sdk/25.08
-
       - name: Install dependencies
         run: npm ci
 
