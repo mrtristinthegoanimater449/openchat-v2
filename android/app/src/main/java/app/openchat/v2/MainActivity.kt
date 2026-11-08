@@ -357,6 +357,8 @@ fun OpenChatApp() {
         }
 
         // ---------- MAIN APP ----------
+        val currentUser = sessionUser ?: return@Surface
+
         Column(modifier = Modifier.fillMaxSize().background(Bg)) {
             // Top bar
             Row(
@@ -374,7 +376,7 @@ fun OpenChatApp() {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    sessionUser.optString("username") + "#" + sessionUser.optString("discriminator"),
+                    currentUser.optString("username") + "#" + currentUser.optString("discriminator"),
                     color = TextMid,
                     fontSize = 13.sp,
                     modifier = Modifier.weight(1f),
@@ -490,7 +492,7 @@ fun OpenChatApp() {
                                 }
                             }
                             items(messages, key = { it.id }) { msg ->
-                                val own = msg.authorId == sessionUser.optString("id")
+                                val own = msg.authorId == currentUser.optString("id")
                                 Row(verticalAlignment = Alignment.Top) {
                                     Box(
                                         modifier = Modifier.size(36.dp).clip(CircleShape)
