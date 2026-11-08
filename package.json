@@ -11,9 +11,9 @@
     "start": "node server.js",
     "api": "node server.js",
     "desktop": "electron .",
-    "dist:win": "electron-builder --win nsis",
-    "dist:mac": "electron-builder --mac pkg",
-    "dist:linux": "electron-builder --linux flatpak",
+    "dist:win": "electron-builder --win nsis --publish never",
+    "dist:mac": "electron-builder --mac pkg --publish never",
+    "dist:linux": "electron-builder --linux flatpak --publish never",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -71,9 +71,9 @@
       "artifactName": "OpenChatV2.${ext}"
     },
     "flatpak": {
-      "sdk": "org.freedesktop.Sdk//22.08",
-      "runtime": "org.freedesktop.Platform//22.08",
-      "base": "org.electronjs.Electron2.BaseApp//22.08",
+      "sdk": "org.freedesktop.Sdk//24.08",
+      "runtime": "org.freedesktop.Platform//24.08",
+      "base": "org.electronjs.Electron2.BaseApp//24.08",
       "finishArgs": [
         "--share=network",
         "--share=ipc",
