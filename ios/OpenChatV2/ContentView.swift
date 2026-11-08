@@ -222,7 +222,7 @@ struct ChatView: View {
                 } else {
                     status = "Can't reach server"
                 }
-                messages = StateParser.globalMessages(state)
+                messages = StateParser.globalMessages(state: state)
                 Api.stateJSON = state.flatMap { try? String(data: JSONSerialization.data(withJSONObject: $0), encoding: .utf8) }
             }
         }
@@ -261,7 +261,7 @@ struct ChatView: View {
                 busy = false
                 if ok {
                     Api.stateJSON = try? String(data: JSONSerialization.data(withJSONObject: stateObj), encoding: .utf8)
-                    messages = StateParser.globalMessages(stateObj)
+                    messages = StateParser.globalMessages(state: stateObj)
                     messageText = ""
                 } else {
                     status = "Failed to sync message"
