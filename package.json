@@ -71,9 +71,9 @@
       "artifactName": "OpenChatV2.${ext}"
     },
     "flatpak": {
-      "sdk": "org.freedesktop.Sdk//24.08",
-      "runtime": "org.freedesktop.Platform//24.08",
-      "base": "org.electronjs.Electron2.BaseApp//24.08",
+      "sdk": "org.freedesktop.Sdk//25.08",
+      "runtime": "org.freedesktop.Platform//25.08",
+      "base": "org.electronjs.Electron2.BaseApp//25.08",
       "finishArgs": [
         "--share=network",
         "--share=ipc",
