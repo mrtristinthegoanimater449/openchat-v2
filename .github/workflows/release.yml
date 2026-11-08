@@ -184,17 +184,18 @@ jobs:
             - name: openchat-v2
               buildsystem: simple
               build-commands:
-                - mkdir -p /app/openchat-v2
+                - mkdir -p /app/bin /app/openchat-v2
                 - cp -R openchat-v2/. /app/openchat-v2/
-                - install -Dm755 open-chat-v2.sh /app/bin/open-chat-v2
+                - |
+                  cat > /app/bin/open-chat-v2 <<'SH'
+                  #!/bin/sh
+                  exec /app/openchat-v2/open-chat-v2 --no-sandbox "$@"
+                  SH
+                - chmod +x /app/bin/open-chat-v2
               sources:
                 - type: dir
                   path: release/linux-unpacked
                   dest: openchat-v2
-                - type: shell
-                  dest-filename: open-chat-v2.sh
-                  commands:
-                    - exec /app/openchat-v2/open-chat-v2 --no-sandbox
           EOF
 
       - name: Build Flatpak
