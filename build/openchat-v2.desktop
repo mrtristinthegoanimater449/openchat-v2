@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=OpenChat V2
+Comment=Native-ish OpenChat V2 client
+Exec=open-chat-v2 %U
+Icon=openchat-v2
+Type=Application
+Categories=Network;InstantMessaging;
+Terminal=false
+StartupWMClass=OpenChat V2
