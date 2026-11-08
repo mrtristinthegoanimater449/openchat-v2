@@ -76,6 +76,16 @@ fun OpenChatApp() {
 
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
+    LaunchedEffect(Unit) {
+        Thread {
+            val discovered = Api.fetchDiscoveryUrl()
+            if (!discovered.isNullOrBlank() && discovered != serverUrl) {
+                Api.setServerUrl(context, discovered)
+                mainHandler.post { serverUrl = discovered }
+            }
+        }.start()
+    }
+
     fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
     fun applyState(state: JSONObject?) {

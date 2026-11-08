@@ -84,6 +84,32 @@ object Api {
         return conn.responseCode to text
     }
 
+    private const val DISCOVERY_URL =
+        "https://raw.githubusercontent.com/mrtristinthegoanimater449/openchat-v2/main/cloudflared_link.json"
+
+    /**
+     * Fetch the current tunnel URL from the repo. Cheap, used to self-update
+     * so the app always points at the live server after a tunnel restart.
+     */
+    fun fetchDiscoveryUrl(): String? {
+        return try {
+            val url = URL(DISCOVERY_URL)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 5_000
+                readTimeout = 5_000
+                doInput = true
+                setRequestProperty("Cache-Control", "no-cache")
+            }
+            val code = conn.responseCode
+            if (code != 200) return null
+            val text = conn.inputStream.bufferedReader().use { it.readText() }
+            val obj = JSONObject(text)
+            obj.optString("url").trim().trimEnd('/').takeIf { it.startsWith("http") }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun login(context: Context, username: String, password: String): JSONObject {
         val (code, text) = request(context, "POST", "/api/auth/login",
             JSONObject().put("username", username).put("password", password), auth = false)

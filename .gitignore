@@ -16,3 +16,5 @@ ios/Payload/
 ios/*.ipa
 youtube-data/
 release/
+create-repo.ps1
+push-deployment.ps1

@@ -1,20 +1,13 @@
-import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
+import { resolveServerUrl } from './lib/apiBase';
 import './index.css';
 
-// If launched by the desktop app with ?desktop=1&server=<url>, remember the
-// server URL (only when not already configured). The user can still change it
-// from inside the app.
-try {
-  const p = new URLSearchParams(window.location.search);
-  if (p.get('desktop') === '1') {
-    const server = p.get('server');
-    if (server && !localStorage.getItem('openchat_server')) {
-      localStorage.setItem('openchat_server', server.trim().replace(/\/+$/, ''));
-    }
-  }
-} catch {
-  /* never block startup on this */
+// Resolve the server URL *before* mounting so the first render already knows
+// where the OpenChat backend lives.
+async function boot() {
+  await resolveServerUrl();
+  const { default: App } = await import('./App.tsx');
+  const { createRoot } = await import('react-dom/client');
+  createRoot(document.getElementById('root')!).render(<App />);
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+void boot();

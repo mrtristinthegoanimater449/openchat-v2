@@ -1,10 +1,13 @@
-// API base URL helpers for the web + desktop (Electron) apps.
+// Auto-discovery for the OpenChat V2 server URL.
 //
-// - Web deployment (served by the OpenChat server): localStorage has no
-//   'openchat_server', so apiUrl() returns the relative path — same-origin, unchanged.
-// - Desktop app (Electron, bundled HTML loaded via file://): the web bundle is
-//   same-origin-less, so all API calls must go to the configured OpenChat server.
-//   On first run the user picks/enters a server URL; it persists in localStorage.
+// Resolution order on startup:
+//  1. localStorage 'openchat_server' (user-configured or previously discovered)
+//  2. globalThis.monacoServerUrl, set by the desktop shell via preload/query param
+//  3. fetch cloudflared_link.json from raw.githubusercontent.com (committed to repo,
+//     kept current by watch-tunnel.ps1 whenever the tunnel restarts)
+const AUTO_DISCOVER_URL =
+  'https://raw.githubusercontent.com/mrtristinthegoanimater449/openchat-v2/main/cloudflared_link.json';
+
 const STORAGE_KEY = 'openchat_server';
 
 export function getApiBase(): string {
@@ -32,4 +35,40 @@ export function isDesktop(): boolean {
     (new URLSearchParams(window.location.search).get('desktop') === '1' ||
       !!(window as any).__OPENCHAT_DESKTOP__)
   );
+}
+
+/**
+ * Resolve the server URL at startup. Runs before the UI mounts so the first
+ * render already knows where to talk.
+ */
+export async function resolveServerUrl(): Promise<string> {
+  // 1) localStorage
+  const stored = getApiBase();
+  if (stored) return stored;
+
+  // 2) desktop shell convenience default
+  if (isDesktop()) {
+    const params = new URLSearchParams(window.location.search);
+    const server = (params.get('server') || '').trim().replace(/\/+$/, '');
+    if (server) {
+      setApiBase(server);
+      return server;
+    }
+  }
+
+  // 3) auto-discovery from GitHub
+  try {
+    const res = await fetch(AUTO_DISCOVER_URL, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      const discovered = String(data?.url || '').trim().replace(/\/+$/, '');
+      if (/^https?:\/\/.+/.test(discovered)) {
+        setApiBase(discovered);
+        return discovered;
+      }
+    }
+  } catch {
+    /* network unavailable — caller decides what to do */
+  }
+  return '';
 }

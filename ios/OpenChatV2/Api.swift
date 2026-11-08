@@ -14,6 +14,20 @@ enum Api {
         UserDefaults.standard.set(trimmed.isEmpty ? defaultServerURL : trimmed, forKey: "server_url")
     }
 
+    /// Fetches the current tunnel URL committed to the repo. Self-updates the
+    /// app so it always points at the live server after a tunnel restart.
+    static func refreshServerURL() async {
+        guard let u = URL(string: "https://raw.githubusercontent.com/mrtristinthegoanimater449/openchat-v2/main/cloudflared_link.json") else { return }
+        guard let (data, resp) = try? await URLSession.shared.data(from: u),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let urlString = obj["url"] as? String else { return }
+        let trimmed = urlString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if trimmed.hasPrefix("http") {
+            UserDefaults.standard.set(trimmed, forKey: "server_url")
+        }
+    }
+
     static var token: String? {
         get { UserDefaults.standard.string(forKey: "token") }
         set { UserDefaults.standard.set(newValue, forKey: "token") }
