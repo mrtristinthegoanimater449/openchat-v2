@@ -15,7 +15,7 @@ import java.net.URL
 object Api {
 
     // Built-in default server — no manual entry needed.
-    const val DEFAULT_SERVER_URL = "https://lid-graduation-automotive-mere.trycloudflare.com"
+    const val DEFAULT_SERVER_URL = "https://welcome-hayes-opposition-edges.trycloudflare.com"
 
     fun getServerUrl(context: Context): String =
         prefs(context).getString("server_url", DEFAULT_SERVER_URL)

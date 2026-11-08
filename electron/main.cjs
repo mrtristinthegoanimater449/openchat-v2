@@ -4,7 +4,7 @@ const path = require('path');
 // Desktop loads the web app bundled inside the installer (file://). The app
 // then talks to any OpenChat server the user configures (first-run setup
 // screen). A default is provided for convenience.
-const DEFAULT_SERVER_URL = 'https://lid-graduation-automotive-mere.trycloudflare.com';
+const DEFAULT_SERVER_URL = 'https://welcome-hayes-opposition-edges.trycloudflare.com';
 const DEFAULT_SERVER = (process.env.OPENCHAT_URL || DEFAULT_SERVER_URL).trim().replace(/\/+$/, '');
 
 function createWindow() {

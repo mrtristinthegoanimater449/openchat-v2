@@ -3,7 +3,7 @@ import Foundation
 /// Minimal JSON-over-HTTP client for the OpenChat V2 server.
 /// All data (accounts, app state) comes from the server.
 enum Api {
-    static let defaultServerURL = "https://lid-graduation-automotive-mere.trycloudflare.com"
+    static let defaultServerURL = "https://welcome-hayes-opposition-edges.trycloudflare.com"
 
     private static var serverURL: String {
         UserDefaults.standard.string(forKey: "server_url") ?? defaultServerURL
