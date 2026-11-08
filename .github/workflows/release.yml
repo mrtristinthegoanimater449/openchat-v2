@@ -191,11 +191,10 @@ jobs:
                 - type: dir
                   path: release/linux-unpacked
                   dest: openchat-v2
-                - type: script
+                - type: shell
                   dest-filename: open-chat-v2.sh
-                  contents: |
-                    #!/bin/sh
-                    exec /app/openchat-v2/open-chat-v2 --no-sandbox "$@"
+                  commands:
+                    - exec /app/openchat-v2/open-chat-v2 --no-sandbox
           EOF
 
       - name: Build Flatpak
